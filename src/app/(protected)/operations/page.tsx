@@ -8,6 +8,7 @@ import Badge from '@/components/ui/Badge';
 import CreateOperationModal from '@/components/CreateOperationModal';
 import SuccessOverlay from '@/components/SuccessOverlay';
 import { Operation, OperationType, OperationStatus } from '@/types';
+import { getOperations, updateOperationStatus } from '@/api/operations';
 import { 
   Package, 
   Truck, 
@@ -42,6 +43,8 @@ const Operations: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [successData, setSuccessData] = useState<{isOpen: boolean, type: OperationType, ref: string}>({ isOpen: false, type: 'Receipt', ref: '' });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Check for navigation state
   useEffect(() => {
@@ -51,25 +54,33 @@ const Operations: React.FC = () => {
     }
   }, [searchParams]);
 
+  const loadOperations = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const data = await getOperations();
+      setOperations(data);
+    } catch (err: any) {
+      console.error('Failed to load operations', err);
+      setError(err.message || 'Failed to load operations');
+      setOperations(initialOperations);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadOperations();
+  }, []);
+
   const handleOpenModal = () => {
     setIsModalOpen(true);
   };
 
   const handleSuccess = (type: OperationType, ref: string) => {
     setSuccessData({ isOpen: true, type, ref });
-    const newOp: Operation = {
-      id: Math.random().toString(36).substr(2, 9),
-      reference: ref,
-      type: type,
-      status: 'Done',
-      scheduleDate: new Date().toISOString().split('T')[0],
-      items: [],
-      responsible: 'You',
-      contact: 'New Partner',
-      sourceLocation: type === 'Receipt' ? 'Vendor' : 'WH/Stock',
-      destinationLocation: type === 'Receipt' ? 'WH/Stock' : 'Customer'
-    };
-    setOperations([newOp, ...operations]);
+    // Reload from Mongo so lists and Kanban reflect the saved operation
+    loadOperations();
   };
 
   const filteredOps = operations.filter(op => {
@@ -98,6 +109,31 @@ const Operations: React.FC = () => {
   // Kanban Columns Logic
   const kanbanColumns: OperationStatus[] = ['Draft', 'Waiting', 'Ready', 'Done'];
   const relevantColumns = activeTab === 'Receipt' ? ['Draft', 'Ready', 'Done'] : kanbanColumns;
+
+  const handleDragStart = (e: React.DragEvent<HTMLDivElement>, id: string) => {
+    e.dataTransfer.setData('text/plain', id);
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+  };
+
+  const handleDropInternal = async (id: string, newStatus: OperationStatus) => {
+    try {
+      const updated = await updateOperationStatus(id, newStatus);
+      setOperations(prev => prev.map(op => (op.id === updated.id ? updated : op)));
+    } catch (err) {
+      console.error('Failed to update operation status', err);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>, newStatus: OperationStatus) => {
+    e.preventDefault();
+    const id = e.dataTransfer.getData('text/plain');
+    if (id) {
+      handleDropInternal(id, newStatus);
+    }
+  };
 
   return (
     <div className="space-y-6 animate-fade-in-up pb-10">
@@ -191,6 +227,11 @@ const Operations: React.FC = () => {
           {/* List View */}
           {viewMode === 'list' && (
             <GlassCard className="p-0 overflow-hidden min-h-[400px]">
+              {error && (
+                <div className="p-3 text-sm text-rose-400 bg-rose-500/10 border-b border-rose-500/30">
+                  {error}
+                </div>
+              )}
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse">
                   <thead>
@@ -236,7 +277,12 @@ const Operations: React.FC = () => {
           {viewMode === 'kanban' && (
             <div className="flex gap-6 overflow-x-auto pb-4 min-h-[500px]">
               {relevantColumns.map((status) => (
-                <div key={status} className="flex-1 min-w-[300px] flex flex-col">
+                <div
+                  key={status}
+                  className="flex-1 min-w-[300px] flex flex-col"
+                  onDragOver={handleDragOver}
+                  onDrop={(e) => handleDrop(e, status as OperationStatus)}
+                >
                   <div className="flex items-center justify-between mb-4 px-1">
                     <div className="flex items-center gap-2">
                        <div className={`w-2 h-2 rounded-full ${
@@ -255,7 +301,9 @@ const Operations: React.FC = () => {
                     {filteredOps.filter(op => op.status === status).map((op) => (
                       <div 
                         key={op.id}
-                        className="bg-[#131824] border border-white/10 rounded-lg p-4 mb-3 hover:border-ocean/50 hover:shadow-lg hover:shadow-ocean/5 transition-all group relative cursor-pointer"
+                        draggable
+                        onDragStart={(e) => handleDragStart(e, op.id)}
+                        className="bg-[#131824] border border-white/10 rounded-lg p-4 mb-3 hover:border-ocean/50 hover:shadow-lg hover:shadow-ocean/5 transition-all group relative cursor-grab active:cursor-grabbing"
                       >
                         <div className="flex justify-between items-start mb-3">
                           <span className="font-bold text-sm text-white">{op.reference}</span>

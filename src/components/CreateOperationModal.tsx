@@ -2,7 +2,9 @@
 import React, { useState, useEffect } from 'react';
 import { X, Printer, Check, Plus, Trash2, AlertCircle, AlertTriangle } from 'lucide-react';
 import Button from './ui/Button';
-import { OperationType, OperationStatus, OperationItem } from '../types';
+import { OperationType, OperationStatus, OperationItem, Product } from '../types';
+import { fetchProducts } from '@/api/products';
+import { createOperation } from '@/api/operations';
 
 interface CreateOperationModalProps {
   isOpen: boolean;
@@ -12,23 +14,9 @@ interface CreateOperationModalProps {
   editData?: any; // If editing existing operation
 }
 
-// Mock available stock for demo
-const mockStock: Record<string, number> = {
-  'NC-X1': 154,
-  'QS-M2': 12,
-  'HP-V4': 85,
-  'OD-4K': 45,
-};
-
-const mockProducts = [
-  { id: '1', name: 'NanoTech Chipset X1', sku: 'NC-X1' },
-  { id: '2', name: 'Quantum Sensor Module', sku: 'QS-M2' },
-  { id: '3', name: 'Hydraulic Piston V4', sku: 'HP-V4' },
-  { id: '5', name: 'OLED Display 4K', sku: 'OD-4K' },
-];
-
 const CreateOperationModal: React.FC<CreateOperationModalProps> = ({ isOpen, onClose, initialType = 'Receipt', onSuccess, editData }) => {
   const [status, setStatus] = useState<OperationStatus>('Draft');
+  const [products, setProducts] = useState<Product[]>([]);
   const [formData, setFormData] = useState({
     reference: '',
     contact: '', // Supplier or Customer
@@ -39,6 +27,14 @@ const CreateOperationModal: React.FC<CreateOperationModalProps> = ({ isOpen, onC
     operationType: initialType
   });
   const [items, setItems] = useState<OperationItem[]>([]);
+
+  // Load products from Mongo for selection
+  useEffect(() => {
+    if (!isOpen) return;
+    fetchProducts()
+      .then(setProducts)
+      .catch((err) => console.error('Failed to load products for operations modal', err));
+  }, [isOpen]);
 
   // Generate auto-reference on open
   useEffect(() => {
@@ -72,12 +68,12 @@ const CreateOperationModal: React.FC<CreateOperationModalProps> = ({ isOpen, onC
     const newItems = [...items];
     if (field === 'productId') {
       // Handle product selection
-      const product = mockProducts.find(p => p.id === value);
+      const product = products.find(p => p.id === value);
       if (product) {
         newItems[index].productId = product.id;
         newItems[index].productName = product.name;
         newItems[index].sku = product.sku;
-        newItems[index].stockAvailable = mockStock[product.sku] || 0;
+        newItems[index].stockAvailable = product.stock || 0;
       }
     } else {
       newItems[index] = { ...newItems[index], [field]: value };
@@ -89,7 +85,7 @@ const CreateOperationModal: React.FC<CreateOperationModalProps> = ({ isOpen, onC
     setItems(items.filter((_, i) => i !== index));
   };
 
-  const handleValidate = () => {
+  const handleValidate = async () => {
     if (status === 'Draft') {
       // Check availability logic for Delivery
       if (initialType === 'Delivery') {
@@ -99,11 +95,25 @@ const CreateOperationModal: React.FC<CreateOperationModalProps> = ({ isOpen, onC
         setStatus('Ready');
       }
     } else if (status === 'Ready' || status === 'Waiting') {
-      setStatus('Done');
-      setTimeout(() => {
-        onSuccess(initialType, formData.reference);
+      // Finalize and persist operation in Mongo as Done
+      const finalStatus: OperationStatus = 'Done';
+      setStatus(finalStatus);
+      try {
+        const created = await createOperation({
+          reference: formData.reference,
+          type: initialType,
+          status: finalStatus,
+          scheduleDate: formData.scheduleDate,
+          contact: formData.contact,
+          sourceLocation: formData.source,
+          destinationLocation: formData.destination,
+          items,
+        });
+        onSuccess(initialType, created.reference);
         onClose();
-      }, 500);
+      } catch (err) {
+        console.error('Failed to create operation', err);
+      }
     }
   };
 
@@ -230,7 +240,7 @@ const CreateOperationModal: React.FC<CreateOperationModalProps> = ({ isOpen, onC
                             onChange={(e) => updateItem(idx, 'productId', e.target.value)}
                           >
                             <option value="" className="bg-deep">Select Product...</option>
-                            {mockProducts.map(p => (
+                            {products.map(p => (
                               <option key={p.id} value={p.id} className="bg-deep">{p.name}</option>
                             ))}
                           </select>
