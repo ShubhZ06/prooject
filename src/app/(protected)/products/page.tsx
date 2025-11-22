@@ -1,14 +1,15 @@
 "use client";
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import GlassCard from '@/components/ui/GlassCard';
-import TiltCard from '@/components/ui/TiltCard'; // New
+import TiltCard from '@/components/ui/TiltCard';
 import { Product } from '@/types';
 import Button from '@/components/ui/Button';
 import Badge from '@/components/ui/Badge';
 import ProductFilters, { FilterState } from '@/components/ProductFilters';
 import ProductModal from '@/components/ProductModal';
-import ImportModal from '@/components/ImportModal'; // New
+import ImportModal from '@/components/ImportModal';
+import { getProducts } from '@/api/products';
 import { 
   Search, 
   Filter, 
@@ -27,19 +28,7 @@ import {
   ArrowUp
 } from 'lucide-react';
 
-const mockProducts: Product[] = [
-  { id: '1', name: 'NanoTech Chipset X1', sku: 'NC-X1', category: 'Electronics', stock: 154, minStock: 20, price: 450, status: 'In Stock', image: 'https://picsum.photos/400/300?random=1', location: 'A-12-04', unit: 'pcs', supplier: 'TechGlobal' },
-  { id: '2', name: 'Quantum Sensor Module', sku: 'QS-M2', category: 'Electronics', stock: 12, minStock: 15, price: 1250, status: 'Low Stock', image: 'https://picsum.photos/400/300?random=2', location: 'B-05-11', unit: 'pcs', supplier: 'QuantumSys' },
-  { id: '3', name: 'Hydraulic Piston V4', sku: 'HP-V4', category: 'Tools', stock: 85, minStock: 10, price: 320, status: 'In Stock', image: 'https://picsum.photos/400/300?random=3', location: 'C-01-02', unit: 'set', supplier: 'MechParts' },
-  { id: '4', name: 'Carbon Fiber Sheet', sku: 'CF-S9', category: 'Materials', stock: 0, minStock: 50, price: 95, status: 'Out of Stock', image: 'https://picsum.photos/400/300?random=4', location: 'D-22-01', unit: 'sqm', supplier: 'MatWorld' },
-  { id: '5', name: 'OLED Display 4K', sku: 'OD-4K', category: 'Electronics', stock: 45, minStock: 20, price: 899, status: 'In Stock', image: 'https://picsum.photos/400/300?random=5', location: 'A-14-02', unit: 'pcs', supplier: 'DisplayTech' },
-  { id: '6', name: 'Wireless Controller', sku: 'WC-01', category: 'Electronics', stock: 200, minStock: 30, price: 59, status: 'In Stock', image: 'https://picsum.photos/400/300?random=6', location: 'E-02-05', unit: 'pcs', supplier: 'GameGear' },
-  { id: '7', name: 'Industrial Servo Motor', sku: 'ISM-900', category: 'Tools', stock: 22, minStock: 5, price: 1200, status: 'In Stock', image: 'https://picsum.photos/400/300?random=7', location: 'C-05-01', unit: 'pcs', supplier: 'MechParts' },
-  { id: '8', name: 'Thermal Paste 5g', sku: 'TP-5G', category: 'Materials', stock: 500, minStock: 100, price: 15, status: 'In Stock', image: 'https://picsum.photos/400/300?random=8', location: 'D-01-01', unit: 'tube', supplier: 'CoolTech' },
-  { id: '9', name: 'Safety Goggles Pro', sku: 'SG-Pro', category: 'Safety Gear', stock: 120, minStock: 20, price: 25, status: 'In Stock', image: 'https://picsum.photos/400/300?random=9', location: 'S-01-01', unit: 'pcs', supplier: 'SafetyFirst' },
-  { id: '10', name: 'Packaging Foam Roll', sku: 'PF-Roll', category: 'Packaging', stock: 8, minStock: 10, price: 45, status: 'Low Stock', image: 'https://picsum.photos/400/300?random=10', location: 'P-10-05', unit: 'roll', supplier: 'PackIt' },
-];
-
+// Products are now loaded from the API (/api/products) instead of a local mock array.
 type SortOption = 'name-asc' | 'name-desc' | 'stock-asc' | 'stock-desc' | 'price-asc' | 'price-desc';
 
 const Products: React.FC = () => {
@@ -49,6 +38,9 @@ const Products: React.FC = () => {
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Filtering & Search State
   const [searchQuery, setSearchQuery] = useState('');
@@ -61,9 +53,26 @@ const Products: React.FC = () => {
     warehouses: []
   });
 
+  useEffect(() => {
+    const load = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+        const data = await getProducts();
+        setProducts(data);
+      } catch (err: any) {
+        console.error('Failed to load products', err);
+        setError(err.message || 'Failed to load products');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    load();
+  }, []);
+
   // Derived Data
   const filteredProducts = useMemo(() => {
-    return mockProducts.filter(product => {
+    return products.filter(product => {
       const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
                             product.sku.toLowerCase().includes(searchQuery.toLowerCase()) ||
                             product.supplier?.toLowerCase().includes(searchQuery.toLowerCase());
@@ -255,6 +264,11 @@ const Products: React.FC = () => {
              Clear All
            </button>
         </div>
+      )}
+
+      {/* Error / loading states */}
+      {error && (
+        <div className="text-sm text-rose-400">{error}</div>
       )}
 
       {/* Views */}

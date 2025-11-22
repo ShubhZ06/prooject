@@ -3,10 +3,12 @@ import app from './app';
 import { env } from './config/env';
 import { connectDB } from './config/db';
 import { seedAdminUser } from './config/seedAdmin';
+import { seedDemoData } from './config/seedDemoData';
 
 const start = async () => {
   await connectDB();
   await seedAdminUser();
+  await seedDemoData();
 
   const server = http.createServer(app);
 
