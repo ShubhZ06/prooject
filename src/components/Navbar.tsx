@@ -149,11 +149,6 @@ const Navbar: React.FC<NavbarProps> = ({ isLanding, onLogout }) => {
               <NotificationDropdown isOpen={isNotifOpen} onClose={() => setIsNotifOpen(false)} />
             </div>
 
-            <button className="hidden sm:flex items-center gap-2 bg-gradient-to-r from-ocean to-teal hover:opacity-90 text-white px-3 py-1.5 rounded-full text-sm font-medium transition-all shadow-lg shadow-ocean/20">
-              <Plus className="w-4 h-4" />
-              <span className="hidden lg:inline">Add</span>
-            </button>
-
             {/* User Avatar & Menu */}
             <div className="relative">
               <div 

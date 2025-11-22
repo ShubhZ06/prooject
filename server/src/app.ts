@@ -9,6 +9,7 @@ import authRoutes from './routes/auth.routes';
 import productRoutes from './routes/products.routes';
 import operationRoutes from './routes/operations.routes';
 import dashboardRoutes from './routes/dashboard.routes';
+import stockMovementRoutes from './routes/stockMovements.routes';
 
 const app = express();
 
@@ -30,6 +31,7 @@ app.get('/api/health', (_req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/operations', operationRoutes);
+app.use('/api/stock-movements', stockMovementRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 
 app.use(errorHandler);

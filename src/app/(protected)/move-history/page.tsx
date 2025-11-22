@@ -1,9 +1,10 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import GlassCard from '@/components/ui/GlassCard';
 import Button from '@/components/ui/Button';
-import { StockMovement } from '@/types';
+import { StockMovement, OperationStatus } from '@/types';
+import { getStockMovements, updateStockMovementStatus } from '@/api/stockMovements';
 import { 
   History, 
   Download, 
@@ -16,7 +17,7 @@ import {
   Package
 } from 'lucide-react';
 
-// Enhanced Mock Data matching new requirements
+// Enhanced Mock Data kept only as design fallback
 const mockMovements: StockMovement[] = [
   { 
     id: 'm1', 
@@ -79,14 +80,71 @@ const mockMovements: StockMovement[] = [
 const MoveHistory: React.FC = () => {
   const [viewMode, setViewMode] = useState<'list' | 'kanban'>('list');
   const [searchQuery, setSearchQuery] = useState('');
+  const [movements, setMovements] = useState<StockMovement[]>(mockMovements);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const filteredMovements = mockMovements.filter(m => 
+  const loadMovements = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const data = await getStockMovements();
+      setMovements(data);
+    } catch (err: any) {
+      console.error('Failed to load stock movements', err);
+      setError(err.message || 'Failed to load move history');
+      setMovements(mockMovements);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadMovements();
+  }, []);
+
+  const filteredMovements = movements.filter(m => 
     m.reference.toLowerCase().includes(searchQuery.toLowerCase()) ||
     m.contact?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     m.product.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const isIncoming = (m: StockMovement) => m.type === 'Receipt' || (m.locationTo && m.locationTo.includes('WH/'));
+
+  const handleExport = () => {
+    const blob = new Blob([JSON.stringify(movements, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'move-history.json';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleDragStart = (e: React.DragEvent<HTMLDivElement>, id: string) => {
+    e.dataTransfer.setData('text/plain', id);
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+  };
+
+  const handleDropInternal = async (id: string, newStatus: OperationStatus) => {
+    try {
+      const updated = await updateStockMovementStatus(id, newStatus);
+      setMovements(prev => prev.map(m => (m.id === updated.id ? updated : m)));
+    } catch (err) {
+      console.error('Failed to update stock movement status', err);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>, newStatus: OperationStatus) => {
+    e.preventDefault();
+    const id = e.dataTransfer.getData('text/plain');
+    if (id) handleDropInternal(id, newStatus);
+  };
 
   return (
     <div className="space-y-6 animate-fade-in-up pb-12">
@@ -99,7 +157,7 @@ const MoveHistory: React.FC = () => {
           <p className="text-slate-400 mt-1">Track all stock moves by reference and contact.</p>
         </div>
         <div className="flex gap-3">
-           <Button variant="glass" icon={<Download className="w-4 h-4" />}>Export</Button>
+           <Button variant="glass" icon={<Download className="w-4 h-4" />} onClick={handleExport}>Export</Button>
         </div>
       </div>
 
@@ -143,6 +201,11 @@ const MoveHistory: React.FC = () => {
       {/* Content */}
       {viewMode === 'list' ? (
         <GlassCard className="p-0 overflow-hidden min-h-[500px]">
+          {error && (
+            <div className="p-3 text-sm text-rose-400 bg-rose-500/10 border-b border-rose-500/30">
+              {error}
+            </div>
+          )}
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
@@ -207,7 +270,12 @@ const MoveHistory: React.FC = () => {
         /* Kanban View */
         <div className="flex gap-6 overflow-x-auto pb-4 min-h-[600px]">
           {['Draft', 'Ready', 'Done'].map((status) => (
-            <div key={status} className="flex-1 min-w-[300px] flex flex-col">
+            <div
+              key={status}
+              className="flex-1 min-w-[300px] flex flex-col"
+              onDragOver={handleDragOver}
+              onDrop={(e) => handleDrop(e, status as OperationStatus)}
+            >
               <div className="flex items-center justify-between mb-4 px-1">
                  <div className="flex items-center gap-2">
                     <div className={`w-2 h-2 rounded-full ${
@@ -227,7 +295,9 @@ const MoveHistory: React.FC = () => {
                   return (
                     <div 
                       key={m.id}
-                      className="bg-[#131824] border border-white/10 rounded-lg p-4 mb-3 hover:border-ocean/50 hover:shadow-lg hover:shadow-ocean/5 transition-all group relative"
+                      draggable
+                      onDragStart={(e) => handleDragStart(e, m.id)}
+                      className="bg-[#131824] border border-white/10 rounded-lg p-4 mb-3 hover:border-ocean/50 hover:shadow-lg hover:shadow-ocean/5 transition-all group relative cursor-grab active:cursor-grabbing"
                     >
                       <div className="flex justify-between items-start mb-3">
                         <span className="text-xs font-mono text-white font-bold">

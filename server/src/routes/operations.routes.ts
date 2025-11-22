@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { Operation, IOperation, OperationStatus, OperationType } from '../models/index';
+import { Operation, IOperation, OperationStatus, OperationType, StockMovement } from '../models/index';
 
 const router = Router();
 
@@ -119,6 +119,25 @@ router.post('/', async (req, res, next) => {
           }))
         : [],
     });
+
+    // Create stock movement entries for move history
+    if (op.items && op.items.length > 0) {
+      await StockMovement.insertMany(
+        op.items.map((i) => ({
+          type: op.type,
+          referenceNumber: op.referenceNumber,
+          product: i.product,
+          productName: i.productName,
+          sku: i.sku,
+          quantity: i.quantity,
+          locationFrom: op.sourceLocation,
+          locationTo: op.destinationLocation,
+          contact: op.contact,
+          status: op.status,
+          timestamp: op.scheduleDate,
+        }))
+      );
+    }
 
     return res.status(201).json(toOperationDTO(op));
   } catch (err) {
