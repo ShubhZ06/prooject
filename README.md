@@ -1,20 +1,51 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# StockMaster IMS
 
-# Run and deploy your AI Studio app
+Inventory management dashboard with, built with Next.js (frontend) and Node.js/Express (backend).
 
-This contains everything you need to run your app locally.
+## Demo Video
 
-View your app in AI Studio: https://ai.studio/apps/temp/3
+Add your walkthrough link here so it is easy to find:
 
-## Run Locally
+> [Watch the demo](https://drive.google.com/drive/folders/1J8PguUxX7vXd5F8CDcbEJoNfWR9ts9IU?usp=drive_link)
 
-**Prerequisites:**  Node.js
+## Tech Stack & Key Imports
+
+- **Frontend**: Next.js, React, Tailwind CSS
+- **Backend**: Express, Mongoose (MongoDB), Helmet, CORS, cookie-parser, morgan
+- **Auth & Security**: bcryptjs, jsonwebtoken
 
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+## Prerequisites
+
+- Node.js (LTS)
+- MongoDB instance/URI
+
+## Setup
+
+1. **Install dependencies**
+   - Root (frontend): `npm install`
+   - Backend API: `cd server && npm install`
+
+2. **Environment variables**  
+   Create a `.env.local` file in the project root (used by both frontend and backend):
+
+   ```bash
+   # Backend
+   MONGODB_URI=your-mongodb-uri
+   JWT_SECRET=your-jwt-secret
+   CLIENT_ORIGIN=http://localhost:3000
+
+   # Admin seed (optional)
+   ADMIN_EMAIL=admin@example.com
+   ADMIN_PASSWORD=changeme
+   ADMIN_FULL_NAME=Admin User
+
+   # Frontend API base
+   NEXT_PUBLIC_API_BASE_URL=/api
+
+3. **Run in development**
+   - Run frontend only: `npm run dev`
+   - Run backend only: `cd server && npm run dev`
+   - Run both together: `npm run dev:all`
+
+The app will be available at `http://localhost:3000` with the API served under `/api`.
