@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import GlassCard from '@/components/ui/GlassCard';
 import TiltCard from '@/components/ui/TiltCard'; // New
 import { Product } from '@/types';
@@ -9,6 +9,7 @@ import Badge from '@/components/ui/Badge';
 import ProductFilters, { FilterState } from '@/components/ProductFilters';
 import ProductModal from '@/components/ProductModal';
 import ImportModal from '@/components/ImportModal'; // New
+import { fetchProducts, createProduct, updateProduct } from '@/api/products';
 import { 
   Search, 
   Filter, 
@@ -27,6 +28,7 @@ import {
   ArrowUp
 } from 'lucide-react';
 
+// Initial mock data kept only as fallback if API fails
 const mockProducts: Product[] = [
   { id: '1', name: 'NanoTech Chipset X1', sku: 'NC-X1', category: 'Electronics', stock: 154, minStock: 20, price: 450, status: 'In Stock', image: 'https://picsum.photos/400/300?random=1', location: 'A-12-04', unit: 'pcs', supplier: 'TechGlobal' },
   { id: '2', name: 'Quantum Sensor Module', sku: 'QS-M2', category: 'Electronics', stock: 12, minStock: 15, price: 1250, status: 'Low Stock', image: 'https://picsum.photos/400/300?random=2', location: 'B-05-11', unit: 'pcs', supplier: 'QuantumSys' },
@@ -49,6 +51,9 @@ const Products: React.FC = () => {
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [products, setProducts] = useState<Product[]>(mockProducts);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Filtering & Search State
   const [searchQuery, setSearchQuery] = useState('');
@@ -61,12 +66,31 @@ const Products: React.FC = () => {
     warehouses: []
   });
 
+  const loadProducts = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const data = await fetchProducts();
+      setProducts(data);
+    } catch (err: any) {
+      console.error('Failed to load products', err);
+      setError(err.message || 'Failed to load products');
+      setProducts(mockProducts);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadProducts();
+  }, []);
+
   // Derived Data
   const filteredProducts = useMemo(() => {
-    return mockProducts.filter(product => {
+    return products.filter(product => {
       const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                            product.sku.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                            product.supplier?.toLowerCase().includes(searchQuery.toLowerCase());
+                           product.sku.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                           product.supplier?.toLowerCase().includes(searchQuery.toLowerCase());
       
       const matchesCategory = filters.categories.length === 0 || filters.categories.includes(product.category);
       
@@ -87,7 +111,7 @@ const Products: React.FC = () => {
         default: return 0;
       }
     });
-  }, [searchQuery, filters, sortOption]);
+  }, [products, searchQuery, filters, sortOption]);
 
   const handleEdit = (product: Product) => {
     setEditingProduct(product);
@@ -97,6 +121,54 @@ const Products: React.FC = () => {
   const handleAdd = () => {
     setEditingProduct(null);
     setIsModalOpen(true);
+  };
+
+  const handleSave = async (input: {
+    name: string;
+    sku: string;
+    category: string;
+    barcode?: string;
+    description?: string;
+    unit: string;
+    minStock: number;
+    price: number;
+    supplier?: string;
+    stock?: number;
+    location?: string;
+    image?: string;
+    isDraft?: boolean;
+  }) => {
+    const computedStatus: Product['status'] =
+      (input.stock ?? editingProduct?.stock ?? 0) <= 0
+        ? 'Out of Stock'
+        : (input.stock ?? editingProduct?.stock ?? 0) < (input.minStock || editingProduct?.minStock || 0)
+        ? 'Low Stock'
+        : 'In Stock';
+
+    const payload: any = {
+      name: input.name,
+      sku: input.sku,
+      category: input.category,
+      stock: input.stock ?? editingProduct?.stock ?? 0,
+      minStock: input.minStock,
+      price: input.price,
+      status: editingProduct ? editingProduct.status : computedStatus,
+      image: input.image ?? editingProduct?.image,
+      location: input.location ?? editingProduct?.location,
+      unit: input.unit,
+      supplier: input.supplier,
+      description: input.description,
+      isActive: input.isDraft ? false : true,
+    };
+
+    if (editingProduct) {
+      await updateProduct(editingProduct.id, payload);
+    } else {
+      await createProduct(payload);
+    }
+
+    await loadProducts();
+    setIsModalOpen(false);
   };
 
   const toggleSelectAll = () => {
@@ -128,10 +200,12 @@ const Products: React.FC = () => {
         isOpen={isModalOpen} 
         onClose={() => setIsModalOpen(false)} 
         product={editingProduct}
+        onSave={handleSave}
       />
       <ImportModal 
         isOpen={isImportOpen}
         onClose={() => setIsImportOpen(false)}
+        onImported={loadProducts}
       />
 
       {/* Header & Controls */}
@@ -222,7 +296,22 @@ const Products: React.FC = () => {
           >
             Import
           </Button>
-          <Button variant="ghost" className="hidden sm:flex" icon={<Download className="w-4 h-4" />}>
+          <Button 
+            variant="ghost" 
+            className="hidden sm:flex" 
+            icon={<Download className="w-4 h-4" />} 
+            onClick={() => {
+              const blob = new Blob([JSON.stringify(products, null, 2)], { type: 'application/json' });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = 'products-export.json';
+              document.body.appendChild(a);
+              a.click();
+              document.body.removeChild(a);
+              URL.revokeObjectURL(url);
+            }}
+          >
             Export
           </Button>
           
@@ -317,7 +406,9 @@ const Products: React.FC = () => {
                     </div>
                     <div className="text-right">
                       <p className="text-xs text-slate-500 mb-1 uppercase tracking-wider">Price</p>
-                      <p className="text-lg font-bold text-ocean">${product.price}</p>
+                      <p className="text-lg font-bold text-ocean">
+                          {product.price.toLocaleString('en-IN')}
+                      </p>
                     </div>
                   </div>
 
@@ -409,7 +500,9 @@ const Products: React.FC = () => {
                         {product.status}
                       </Badge>
                     </td>
-                    <td className="p-4 font-medium text-white">${product.price}</td>
+                    <td className="p-4 font-medium text-white">
+                        {product.price.toLocaleString('en-IN')}
+                    </td>
                     <td className="p-4 text-slate-400">{product.location}</td>
                     <td className="p-4 text-right">
                       <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">

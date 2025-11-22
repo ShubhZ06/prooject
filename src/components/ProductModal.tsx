@@ -1,16 +1,34 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { X, Upload, Info, Layers, MapPin, Tag, Plus, Trash2 } from 'lucide-react';
 import Button from './ui/Button';
 import { Product } from '../types';
+import { uploadImageToCloudinary } from '@/lib/cloudinary';
 
 interface ProductModalProps {
   isOpen: boolean;
   onClose: () => void;
   product?: Product | null;
+  onSave: (data: {
+    name: string;
+    sku: string;
+    category: string;
+    barcode?: string;
+    description?: string;
+    unit: string;
+    minStock: number;
+    price: number;
+    supplier?: string;
+    stock?: number;
+    location?: string;
+    image?: string;
+    isDraft?: boolean;
+  }) => Promise<void> | void;
 }
 
-const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, product }) => {
+const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, product, onSave }) => {
   const [activeTab, setActiveTab] = useState<'basic' | 'inventory' | 'details'>('basic');
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [imageUploading, setImageUploading] = useState(false);
   
   // Form state
   const [formData, setFormData] = useState({
@@ -24,6 +42,9 @@ const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, product })
     reorderQty: '',
     price: '',
     supplier: '',
+    stock: '',
+    location: 'Main Warehouse (Zone A)',
+    image: '',
   });
 
   useEffect(() => {
@@ -39,6 +60,9 @@ const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, product })
         reorderQty: '50', // Mock default
         price: product.price.toString(),
         supplier: product.supplier || '',
+        stock: product.stock.toString(),
+        location: product.location || 'Main Warehouse (Zone A)',
+        image: product.image || '',
       });
     } else {
       // Reset for new product
@@ -53,11 +77,56 @@ const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, product })
         reorderQty: '',
         price: '',
         supplier: '',
+        stock: '',
+        location: 'Main Warehouse (Zone A)',
+        image: '',
       });
     }
   }, [product, isOpen]);
 
   if (!isOpen) return null;
+
+  const buildPayload = (isDraft?: boolean) => ({
+    name: formData.name,
+    sku: formData.sku,
+    category: formData.category,
+    barcode: formData.barcode || undefined,
+    description: formData.description || undefined,
+    unit: formData.unit,
+    minStock: Number(formData.minStock || 0),
+    price: Number(formData.price || 0),
+    supplier: formData.supplier || undefined,
+    stock: Number(formData.stock || 0),
+    location: formData.location,
+    image: formData.image || product?.image,
+    isDraft,
+  });
+
+  const handleSubmit = async () => {
+    await onSave(buildPayload(false));
+  };
+
+  const handleSaveDraft = async () => {
+    await onSave(buildPayload(true));
+  };
+
+  const handleBrowseClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      setImageUploading(true);
+      const url = await uploadImageToCloudinary(file);
+      setFormData(prev => ({ ...prev, image: url }));
+    } catch (err) {
+      console.error('Failed to upload image to Cloudinary', err);
+    } finally {
+      setImageUploading(false);
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -116,8 +185,8 @@ const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, product })
             {/* Image Upload Section (Always visible) */}
             <div className="mb-8 flex gap-6">
               <div className="w-32 h-32 rounded-2xl border-2 border-dashed border-white/20 bg-white/5 flex flex-col items-center justify-center text-slate-400 hover:border-ocean/50 hover:bg-ocean/5 transition-all cursor-pointer group relative overflow-hidden">
-                {product?.image ? (
-                   <img src={product.image} alt="Preview" className="w-full h-full object-cover" />
+                {formData.image || product?.image ? (
+                   <img src={formData.image || product?.image} alt="Preview" className="w-full h-full object-cover" />
                 ) : (
                   <>
                     <Upload className="w-8 h-8 mb-2 group-hover:scale-110 transition-transform" />
@@ -128,10 +197,27 @@ const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, product })
               </div>
               <div className="flex-1">
                 <h3 className="font-medium text-white mb-2">Product Image</h3>
-                <p className="text-sm text-slate-400 mb-4">Supports JPG, PNG and WEBP. Max file size 5MB.</p>
-                <div className="flex gap-3">
-                   <Button variant="glass" size="sm">Browse Files</Button>
-                   <Button variant="ghost" size="sm" className="text-rose-400 hover:text-rose-300 hover:bg-rose-500/10">Remove</Button>
+                <p className="text-sm text-slate-400 mb-1">Supports JPG, PNG and WEBP. Max file size 5MB.</p>
+                {imageUploading && (
+                  <p className="text-xs text-ocean mb-2">Uploading to Cloudinary...</p>
+                )}
+                <div className="flex gap-3 items-center">
+                   <Button variant="glass" size="sm" onClick={handleBrowseClick} isLoading={imageUploading}>Browse Files</Button>
+                   <Button 
+                     variant="ghost" 
+                     size="sm" 
+                     className="text-rose-400 hover:text-rose-300 hover:bg-rose-500/10"
+                     onClick={() => setFormData(prev => ({ ...prev, image: '' }))}
+                   >
+                     Remove
+                   </Button>
+                   <input 
+                     ref={fileInputRef}
+                     type="file"
+                     accept="image/*"
+                     className="hidden"
+                     onChange={handleImageChange}
+                   />
                 </div>
               </div>
             </div>
@@ -159,7 +245,20 @@ const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, product })
                         className="w-full bg-surface border border-white/10 rounded-lg px-4 py-2.5 focus:border-ocean focus:ring-1 focus:ring-ocean outline-none transition-all text-white" 
                         placeholder="NC-X1" 
                       />
-                      <button className="px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-xs font-medium hover:bg-white/10 text-slate-300">Generate</button>
+                      <button 
+                        type="button"
+                        className="px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-xs font-medium hover:bg-white/10 text-slate-300"
+                        onClick={() => {
+                          const base = (formData.name || 'PRD')
+                            .toUpperCase()
+                            .replace(/[^A-Z0-9]/g, '')
+                            .slice(0, 3) || 'PRD';
+                          const rand = Math.floor(100 + Math.random() * 900);
+                          setFormData({ ...formData, sku: `${base}-${rand}` });
+                        }}
+                      >
+                        Generate
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -254,7 +353,11 @@ const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, product })
                     </div>
                     
                     <div className="flex items-center gap-4">
-                      <select className="flex-1 bg-deep border border-white/10 rounded-lg px-3 py-2 text-sm text-slate-300">
+                      <select 
+                        className="flex-1 bg-deep border border-white/10 rounded-lg px-3 py-2 text-sm text-slate-300"
+                        value={formData.location}
+                        onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                      >
                         <option>Main Warehouse (Zone A)</option>
                         <option>East Wing (Zone B)</option>
                       </select>
@@ -262,7 +365,8 @@ const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, product })
                         type="number" 
                         className="w-24 bg-deep border border-white/10 rounded-lg px-3 py-2 text-sm text-white" 
                         placeholder="0"
-                        defaultValue={product ? product.stock : 0}
+                        value={formData.stock}
+                        onChange={(e) => setFormData({ ...formData, stock: e.target.value })}
                       />
                       <button className="p-2 hover:bg-rose-500/20 hover:text-rose-500 rounded text-slate-500">
                         <Trash2 className="w-4 h-4" />
@@ -294,7 +398,7 @@ const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, product })
                     </select>
                   </div>
                    <div className="space-y-2">
-                    <label className="text-sm font-medium text-slate-300">Unit Price ($)</label>
+                    <label className="text-sm font-medium text-slate-300">Unit Price (₹)</label>
                     <input 
                       type="number" 
                       value={formData.price}
@@ -323,8 +427,8 @@ const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, product })
         {/* Footer Actions */}
         <div className="p-6 border-t border-white/10 bg-surface/50 flex justify-end gap-4">
           <Button variant="ghost" onClick={onClose}>Cancel</Button>
-          <Button variant="outline">Save as Draft</Button>
-          <Button variant="primary" onClick={onClose}>
+          <Button variant="outline" onClick={handleSaveDraft}>Save as Draft</Button>
+          <Button variant="primary" onClick={handleSubmit}>
             {product ? 'Update Product' : 'Save Product'}
           </Button>
         </div>

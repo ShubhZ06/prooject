@@ -5,9 +5,10 @@ import Button from './ui/Button';
 interface ImportModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onImported?: () => void;
 }
 
-const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose }) => {
+const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImported }) => {
   const [dragActive, setDragActive] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -41,14 +42,26 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose }) => {
     }
   };
 
-  const handleUpload = () => {
+  const handleUpload = async () => {
     if (!file) return;
     setUploading(true);
-    // Simulate upload
-    setTimeout(() => {
-      setUploading(false);
+    try {
+      const text = await file.text();
+      const items = JSON.parse(text);
+      const res = await fetch('/api/products/bulk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(items),
+      });
+      if (!res.ok) throw new Error('Import failed');
       setStatus('success');
-    }, 2000);
+      if (onImported) onImported();
+    } catch (err) {
+      console.error(err);
+      setStatus('error');
+    } finally {
+      setUploading(false);
+    }
   };
 
   return (

@@ -47,26 +47,43 @@ router.get('/', async (req, res, next) => {
   }
 });
 
+// Helper to map request body to Product fields
+const mapBodyToProduct = (body: any) => ({
+  name: body.name,
+  sku: body.sku,
+  category: body.category,
+  stock: body.stock ?? 0,
+  minStockLevel: body.minStock ?? 0,
+  price: body.price ?? 0,
+  status: body.status ?? 'In Stock',
+  image: body.image,
+  location: body.location,
+  unitOfMeasure: body.unit ?? 'pcs',
+  supplierInfo: body.supplier,
+  description: body.description,
+  isActive: body.isActive !== undefined ? body.isActive : true,
+});
+
 // POST /api/products
 router.post('/', async (req, res, next) => {
   try {
-    const body = req.body;
-    const product = await Product.create({
-      name: body.name,
-      sku: body.sku,
-      category: body.category,
-      stock: body.stock ?? 0,
-      minStockLevel: body.minStock ?? 0,
-      price: body.price ?? 0,
-      status: body.status ?? 'In Stock',
-      image: body.image,
-      location: body.location,
-      unitOfMeasure: body.unit ?? 'pcs',
-      supplierInfo: body.supplier,
-      description: body.description,
-    });
-
+    const product = await Product.create(mapBodyToProduct(req.body));
     return res.status(201).json(toProductDTO(product));
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /api/products/bulk
+router.post('/bulk', async (req, res, next) => {
+  try {
+    const items = req.body;
+    if (!Array.isArray(items)) {
+      return res.status(400).json({ message: 'Expected an array of products' });
+    }
+
+    const docs = await Product.insertMany(items.map(mapBodyToProduct));
+    return res.status(201).json(docs.map(toProductDTO));
   } catch (err) {
     next(err);
   }
@@ -80,22 +97,7 @@ router.put('/:id', async (req, res, next) => {
 
     const product = await Product.findByIdAndUpdate(
       id,
-      {
-        $set: {
-          name: body.name,
-          sku: body.sku,
-          category: body.category,
-          stock: body.stock,
-          minStockLevel: body.minStock,
-          price: body.price,
-          status: body.status,
-          image: body.image,
-          location: body.location,
-          unitOfMeasure: body.unit,
-          supplierInfo: body.supplier,
-          description: body.description,
-        },
-      },
+      { $set: mapBodyToProduct(body) },
       { new: true }
     );
 
