@@ -26,9 +26,16 @@ async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> 
 
 export interface AuthUser {
   id: string;
+  // original field from DB
   fullName: string;
+  // renamed/alias field exposed by /auth/me
+  name: string;
   email: string;
-  role: string;
+  username: string;
+  role: 'admin' | 'manager' | 'user';
+  phone?: string;
+  location?: string;
+  joinedAt?: string;
 }
 
 export function login(email: string, password: string) {
@@ -38,10 +45,17 @@ export function login(email: string, password: string) {
   });
 }
 
-export function register(fullName: string, email: string, password: string) {
+export function register(
+  fullName: string,
+  email: string,
+  password: string,
+  phone?: string,
+  location?: string,
+  role?: 'manager' | 'user'
+) {
   return apiFetch<AuthUser>('/auth/register', {
     method: 'POST',
-    body: JSON.stringify({ fullName, email, password }),
+    body: JSON.stringify({ fullName, email, password, phone, location, role }),
   });
 }
 

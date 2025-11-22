@@ -20,6 +20,7 @@ import {
   FileText
 } from 'lucide-react';
 import NotificationDropdown from './ui/NotificationDropdown';
+import { getCurrentUser, AuthUser } from '@/api/auth';
 
 interface NavbarProps {
   isLanding: boolean;
@@ -32,6 +33,7 @@ const Navbar: React.FC<NavbarProps> = ({ isLanding, onLogout }) => {
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [hoveredLink, setHoveredLink] = useState<string | null>(null);
+  const [user, setUser] = useState<AuthUser | null>(null);
   const pathname = usePathname();
 
   useEffect(() => {
@@ -39,6 +41,14 @@ const Navbar: React.FC<NavbarProps> = ({ isLanding, onLogout }) => {
       setIsScrolled(window.scrollY > 20);
     };
     window.addEventListener('scroll', handleScroll);
+
+    // Fetch current user for navbar display
+    getCurrentUser()
+      .then(setUser)
+      .catch((err) => {
+        console.error('Failed to load current user for navbar', err);
+      });
+
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
@@ -162,8 +172,8 @@ const Navbar: React.FC<NavbarProps> = ({ isLanding, onLogout }) => {
                   <div className="fixed inset-0 z-30" onClick={() => setIsUserMenuOpen(false)} />
                   <div className="absolute top-full right-0 mt-3 w-56 bg-[#131824] border border-white/10 rounded-2xl shadow-2xl z-40 py-2 animate-fade-in-up">
                     <div className="px-4 py-3 border-b border-white/5 mb-1">
-                      <p className="text-sm font-medium text-white">Alex Morgan</p>
-                      <p className="text-xs text-slate-500">admin@stockmaster.io</p>
+                      <p className="text-sm font-medium text-white">{user?.name || user?.fullName || 'User'}</p>
+                      <p className="text-xs text-slate-500">{user?.email || ''}</p>
                     </div>
                     <Link 
                       href="/profile" 

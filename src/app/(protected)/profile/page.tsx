@@ -1,9 +1,10 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import GlassCard from '@/components/ui/GlassCard';
 import Button from '@/components/ui/Button';
 import Badge from '@/components/ui/Badge';
+import { getCurrentUser, AuthUser } from '@/api/auth';
 import { 
   User, 
   Mail, 
@@ -20,6 +21,33 @@ import {
 
 const Profile: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'overview' | 'security' | 'activity'>('overview');
+  const [user, setUser] = useState<AuthUser | null>(null);
+
+  useEffect(() => {
+    getCurrentUser()
+      .then(setUser)
+      .catch((err) => {
+        console.error('Failed to load current user for profile page', err);
+      });
+  }, []);
+
+  const displayName = user?.name || user?.fullName || 'Alex Morgan';
+  const displayEmail = user?.email || 'alex.morgan@stockmaster.io';
+  const displayPhone = user?.phone || '+1 (555) 123-4567';
+  const displayLocation = user?.location || 'San Francisco, CA';
+  const displayRole = user?.role ? user.role.charAt(0).toUpperCase() + user.role.slice(1) : 'Administrator';
+
+  let displayJoined = 'Oct 24, 2022';
+  if (user?.joinedAt) {
+    const d = new Date(user.joinedAt);
+    if (!isNaN(d.getTime())) {
+      displayJoined = d.toLocaleDateString(undefined, {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+      });
+    }
+  }
 
   const activityLog = [
     { action: 'Created Product', detail: 'NanoTech Chipset X1', time: '2 hours ago', icon: 'Package' },
@@ -54,7 +82,7 @@ const Profile: React.FC = () => {
           </div>
 
           <div className="flex-1 mb-2">
-             <h1 className="text-3xl font-bold text-white">Alex Morgan</h1>
+             <h1 className="text-3xl font-bold text-white">{displayName}</h1>
              <p className="text-slate-400">Senior Inventory Manager</p>
           </div>
 
@@ -98,37 +126,37 @@ const Profile: React.FC = () => {
                   <div>
                     <label className="text-xs text-slate-500 uppercase tracking-wider font-semibold">Full Name</label>
                     <div className="mt-1 flex items-center gap-3 text-slate-200">
-                      <User className="w-4 h-4 text-ocean" /> Alex Morgan
+                      <User className="w-4 h-4 text-ocean" /> {displayName}
                     </div>
                   </div>
                   <div>
                     <label className="text-xs text-slate-500 uppercase tracking-wider font-semibold">Email Address</label>
                     <div className="mt-1 flex items-center gap-3 text-slate-200">
-                      <Mail className="w-4 h-4 text-ocean" /> alex.morgan@stockmaster.io
+                      <Mail className="w-4 h-4 text-ocean" /> {displayEmail}
                     </div>
                   </div>
                   <div>
                     <label className="text-xs text-slate-500 uppercase tracking-wider font-semibold">Phone</label>
                     <div className="mt-1 flex items-center gap-3 text-slate-200">
-                      <Phone className="w-4 h-4 text-ocean" /> +1 (555) 123-4567
+                      <Phone className="w-4 h-4 text-ocean" /> {displayPhone}
                     </div>
                   </div>
                   <div>
                     <label className="text-xs text-slate-500 uppercase tracking-wider font-semibold">Location</label>
                     <div className="mt-1 flex items-center gap-3 text-slate-200">
-                      <MapPin className="w-4 h-4 text-ocean" /> San Francisco, CA
+                      <MapPin className="w-4 h-4 text-ocean" /> {displayLocation}
                     </div>
                   </div>
                   <div>
                     <label className="text-xs text-slate-500 uppercase tracking-wider font-semibold">Role</label>
                     <div className="mt-1">
-                      <Badge variant="info">Administrator</Badge>
+                      <Badge variant="info">{displayRole}</Badge>
                     </div>
                   </div>
                   <div>
                     <label className="text-xs text-slate-500 uppercase tracking-wider font-semibold">Joined</label>
                     <div className="mt-1 flex items-center gap-3 text-slate-200">
-                      <Clock className="w-4 h-4 text-ocean" /> Oct 24, 2022
+                      <Clock className="w-4 h-4 text-ocean" /> {displayJoined}
                     </div>
                   </div>
                 </div>

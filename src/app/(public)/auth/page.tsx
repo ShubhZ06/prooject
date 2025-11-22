@@ -18,6 +18,9 @@ const Auth: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [location, setLocation] = useState('');
+  const [role, setRole] = useState<'manager' | 'user'>('manager');
   const [error, setError] = useState<string | null>(null);
   
   const handleLogin = async (e: React.FormEvent) => {
@@ -40,7 +43,7 @@ const Auth: React.FC = () => {
     setIsLoading(true);
     setError(null);
     try {
-      await register(fullName, email, password);
+      await register(fullName, email, password, phone, location, role);
       // For now, log the user in immediately after registration
       // setIsAuthenticated(true);
       router.push('/dashboard');
@@ -64,7 +67,7 @@ const Auth: React.FC = () => {
         <div className="absolute bottom-[-20%] left-[-10%] w-[60%] h-[60%] bg-teal/10 rounded-full blur-[150px]" />
       </div>
 
-      <div className="w-full max-w-6xl grid grid-cols-1 lg:grid-cols-2 gap-8 z-10 h-[80vh] items-center">
+      <div className="w-full max-w-6xl grid grid-cols-1 lg:grid-cols-2 gap-8 z-10 items-start lg:items-center">
         
         {/* Left: 3D Visuals */}
         <div className="hidden lg:flex flex-col justify-center h-full relative">
@@ -195,6 +198,46 @@ const Auth: React.FC = () => {
                         placeholder="name@company.com"
                       />
                     </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-xs font-medium text-slate-300 uppercase tracking-wider">Contact Number</label>
+                    <div className="relative group">
+                      <input 
+                        type="tel"
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value)}
+                        pattern="^(\\+91[- ]?)?[6-9]\\d{9}$"
+                        maxLength={14}
+                        className="w-full bg-deep/50 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:border-ocean outline-none transition-all" 
+                        placeholder="+91 98765 43210"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-xs font-medium text-slate-300 uppercase tracking-wider">Location</label>
+                    <div className="relative group">
+                      <input 
+                        type="text"
+                        value={location}
+                        onChange={(e) => setLocation(e.target.value)}
+                        className="w-full bg-deep/50 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:border-ocean outline-none transition-all" 
+                        placeholder="Pune, Maharashtra, India"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-xs font-medium text-slate-300 uppercase tracking-wider">Role</label>
+                    <select
+                      value={role}
+                      onChange={(e) => setRole(e.target.value as 'manager' | 'user')}
+                      className="w-full bg-deep/50 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:border-ocean outline-none transition-all text-sm"
+                    >
+                      <option value="manager">Manager</option>
+                      <option value="user">User</option>
+                    </select>
                   </div>
 
                   <div className="space-y-2">
